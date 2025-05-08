@@ -335,7 +335,7 @@ jobs:
           echo "Multi-arch manifest created and pushed successfully"
 
       - name: Create and push manifest to DockerHub
-        if: (github.event.inputs.push_to_dockerhub == 'true' || github.event_name != 'workflow_dispatch') && (needs.build-amd64.outputs.status == 'success' || needs.build-arm64.outputs.status == 'success')
+        if: github.event.inputs.push_to_dockerhub == 'true' && (needs.build-amd64.outputs.status == 'success' || needs.build-arm64.outputs.status == 'success')
         run: |
           docker manifest create frdel/agent-zero-run:${{ needs.prepare.outputs.image_tag }}
           if [[ -n "$AMD64_IMAGE" ]]; then
