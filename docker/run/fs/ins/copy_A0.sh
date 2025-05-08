@@ -1,11 +1,14 @@
 #!/bin/bash
 
-# Paths
-SOURCE_DIR="/git/agent-zero"
-TARGET_DIR="/a0"
+# Extract repository name from URL (everything after the last slash)
+REPO_NAME=$(basename "${REPO_URL:-https://github.com/frdel/agent-zero}")
+SOURCE_DIR="/git/$REPO_NAME"
+DEST_DIR="/a0"
 
-# Copy repository files if run_ui.py is missing in /a0 (if the volume is mounted)
-if [ ! -f "$TARGET_DIR/run_ui.py" ]; then
-    echo "Copying files from $SOURCE_DIR to $TARGET_DIR..."
-    cp -rn --no-preserve=ownership,mode "$SOURCE_DIR/." "$TARGET_DIR"
-fi
+# Create destination directory if it doesn't exist
+mkdir -p $DEST_DIR
+
+# Copy the contents of the source directory to the destination directory
+cp -r $SOURCE_DIR/* $DEST_DIR/
+
+echo "Copy completed successfully."
