@@ -278,17 +278,26 @@ const settingsModalProxy = {
         if (field.action === 'edit_model_list') {
             // Open the model list editor
             const modelListEditorModal = document.getElementById('modelListEditorModal');
+            console.log('Model list editor modal element:', modelListEditorModal);
+
             if (modelListEditorModal) {
                 const modelListManager = Alpine.$data(modelListEditorModal);
+                console.log('Model list manager data:', modelListManager);
+
                 if (modelListManager) {
                     // Set the model type and open the editor
+                    console.log(`Opening model list editor for ${field.model_type}`);
                     modelListManager.openModelListEditor(field.model_type);
 
                     // Dispatch an event to update the model lists
                     const modalEl = document.getElementById('settingsModal');
                     const modalAD = Alpine.$data(modalEl);
                     document.dispatchEvent(new CustomEvent('settings-updated', { detail: modalAD.settings }));
+                } else {
+                    console.error('Could not get Alpine data for modelListManager');
                 }
+            } else {
+                console.error('Could not find modelListEditorModal element');
             }
         }
     }
@@ -319,6 +328,32 @@ document.addEventListener('alpine:init', function () {
 
         toggleSettings() {
             this.isOpen = !this.isOpen;
+        }
+    });
+
+    // Listen for model list updates
+    document.addEventListener('model-list-updated', function(event) {
+        console.log('Model list updated event received', event.detail);
+
+        // Get the settings modal
+        const modalEl = document.getElementById('settingsModal');
+        if (modalEl) {
+            const modalAD = Alpine.$data(modalEl);
+            if (modalAD && modalAD.settings) {
+                // Update the appropriate model list
+                const type = event.detail.type;
+                const models = event.detail.models;
+
+                if (type === 'chat') {
+                    modalAD.settings.chat_models = models;
+                } else if (type === 'util') {
+                    modalAD.settings.util_models = models;
+                } else if (type === 'embed') {
+                    modalAD.settings.embed_models = models;
+                } else if (type === 'browser') {
+                    modalAD.settings.browser_models = models;
+                }
+            }
         }
     });
 
