@@ -1,0 +1,198 @@
+<!-- Model List Editor Modal -->
+<div x-data="modelListManager" class="model-list-editor" x-show="isModelListEditorOpen" x-cloak>
+    <div class="modal-overlay" @click="closeModelListEditor"></div>
+    <div class="modal-container">
+        <div class="modal-header">
+            <h2 x-text="'Edit ' + currentModelType + ' Models'"></h2>
+            <button class="close-button" @click="closeModelListEditor">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p class="model-list-description">
+                Configure multiple models for failover. Models will be tried in order until one works.
+                The first model is the primary model and will be tried first.
+            </p>
+            
+            <div class="model-list">
+                <template x-for="(model, index) in getCurrentModelList()" :key="index">
+                    <div class="model-item">
+                        <div class="model-header">
+                            <span class="model-number" x-text="index + 1"></span>
+                            <div class="model-actions">
+                                <button class="btn btn-icon" @click="moveModelUp(index)" :disabled="index === 0">
+                                    <i class="fas fa-arrow-up"></i>
+                                </button>
+                                <button class="btn btn-icon" @click="moveModelDown(index)" :disabled="index === getCurrentModelList().length - 1">
+                                    <i class="fas fa-arrow-down"></i>
+                                </button>
+                                <button class="btn btn-icon btn-danger" @click="removeModel(index)" :disabled="getCurrentModelList().length <= 1">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="model-fields">
+                            <div class="field-group">
+                                <label>Provider</label>
+                                <select x-model="model.provider">
+                                    <option value="ANTHROPIC">Anthropic</option>
+                                    <option value="DEEPSEEK">DeepSeek</option>
+                                    <option value="GOOGLE">Google</option>
+                                    <option value="GROQ">Groq</option>
+                                    <option value="HUGGINGFACE">HuggingFace</option>
+                                    <option value="LMSTUDIO">LM Studio</option>
+                                    <option value="MISTRALAI">Mistral AI</option>
+                                    <option value="OLLAMA">Ollama</option>
+                                    <option value="OPENAI">OpenAI</option>
+                                    <option value="OPENAI_AZURE">OpenAI Azure</option>
+                                    <option value="OPENROUTER">OpenRouter</option>
+                                    <option value="SAMBANOVA">Sambanova</option>
+                                    <option value="OTHER">Other</option>
+                                </select>
+                            </div>
+                            <div class="field-group">
+                                <label>Model Name</label>
+                                <input type="text" x-model="model.name" placeholder="Model name (e.g., gpt-4o)">
+                            </div>
+                            <div class="field-group">
+                                <label>Context Length</label>
+                                <input type="number" x-model.number="model.ctx_length" min="0">
+                            </div>
+                            <div class="field-group">
+                                <label>Vision Support</label>
+                                <div class="switch-container">
+                                    <label class="switch">
+                                        <input type="checkbox" x-model="model.vision">
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="field-group">
+                                <label>Additional Parameters</label>
+                                <textarea x-model="model.kwargs" placeholder="temperature=0"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            
+            <div class="model-list-actions">
+                <button class="btn btn-primary" @click="addModel()">
+                    <i class="fas fa-plus"></i> Add Model
+                </button>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-ok" @click="saveModelList()">Save</button>
+            <button class="btn btn-cancel" @click="closeModelListEditor()">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<style>
+.model-list-editor {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.modal-container {
+    position: relative;
+    width: 80%;
+    max-width: 800px;
+    max-height: 90vh;
+    background-color: var(--bg-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.modal-header {
+    padding: 16px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-body {
+    padding: 16px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.modal-footer {
+    padding: 16px;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.model-list-description {
+    margin-bottom: 16px;
+}
+
+.model-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.model-item {
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 16px;
+    background-color: var(--bg-color-secondary);
+}
+
+.model-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.model-number {
+    font-weight: bold;
+    font-size: 1.2em;
+}
+
+.model-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.model-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+.field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.model-list-actions {
+    margin-top: 16px;
+    display: flex;
+    justify-content: center;
+}
+</style>

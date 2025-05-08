@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="css/speech.css">
     <link rel="stylesheet" href="css/history.css">
     <link rel="stylesheet" href="css/scheduler-datepicker.css">
+    <link rel="stylesheet" href="css/model-list.css">
 
     <!-- Flatpickr for datetime picker -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
@@ -96,6 +97,7 @@
     <script type="module" src="js/scheduler.js"></script>
     <script type="module" src="js/speech.js"></script>
     <script type="module" src="js/history.js"></script>
+    <script type="module" src="js/model-list.js"></script>
     <script type="module" src="index.js"></script>
 
     <!-- Then load Alpine.js -->
@@ -1616,6 +1618,99 @@
         <div class="dragdrop-subtext"></div>
     </div>
 
+
+    <!-- Model List Editor Modal -->
+    <div id="modelListEditorModal" x-data="modelListManager">
+        <template x-teleport="body">
+            <div x-show="isModelListEditorOpen" class="modal-overlay" @click.self="closeModelListEditor()"
+                @keydown.escape.window="closeModelListEditor()" x-transition>
+                <div class="modal-container">
+                    <div class="modal-header">
+                        <h2 x-text="'Edit ' + currentModelType + ' Models'"></h2>
+                        <button class="modal-close" @click="closeModelListEditor()">&times;</button>
+                    </div>
+                    <div class="modal-content">
+                        <p class="model-list-description">
+                            Configure multiple models for failover. Models will be tried in order until one works.
+                            The first model is the primary model and will be tried first.
+                        </p>
+
+                        <div class="model-list">
+                            <template x-for="(model, index) in getCurrentModelList()" :key="index">
+                                <div class="model-item">
+                                    <div class="model-header">
+                                        <span class="model-number" x-text="index + 1"></span>
+                                        <div class="model-actions">
+                                            <button class="btn btn-icon" @click="moveModelUp(index)" :disabled="index === 0">
+                                                <i class="fas fa-arrow-up">↑</i>
+                                            </button>
+                                            <button class="btn btn-icon" @click="moveModelDown(index)" :disabled="index === getCurrentModelList().length - 1">
+                                                <i class="fas fa-arrow-down">↓</i>
+                                            </button>
+                                            <button class="btn btn-icon btn-danger" @click="removeModel(index)" :disabled="getCurrentModelList().length <= 1">
+                                                <i class="fas fa-trash">×</i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="model-fields">
+                                        <div class="field-group">
+                                            <label>Provider</label>
+                                            <select x-model="model.provider">
+                                                <option value="ANTHROPIC">Anthropic</option>
+                                                <option value="DEEPSEEK">DeepSeek</option>
+                                                <option value="GOOGLE">Google</option>
+                                                <option value="GROQ">Groq</option>
+                                                <option value="HUGGINGFACE">HuggingFace</option>
+                                                <option value="LMSTUDIO">LM Studio</option>
+                                                <option value="MISTRALAI">Mistral AI</option>
+                                                <option value="OLLAMA">Ollama</option>
+                                                <option value="OPENAI">OpenAI</option>
+                                                <option value="OPENAI_AZURE">OpenAI Azure</option>
+                                                <option value="OPENROUTER">OpenRouter</option>
+                                                <option value="SAMBANOVA">Sambanova</option>
+                                                <option value="OTHER">Other</option>
+                                            </select>
+                                        </div>
+                                        <div class="field-group">
+                                            <label>Model Name</label>
+                                            <input type="text" x-model="model.name" placeholder="Model name (e.g., gpt-4o)">
+                                        </div>
+                                        <div class="field-group">
+                                            <label>Context Length</label>
+                                            <input type="number" x-model.number="model.ctx_length" min="0">
+                                        </div>
+                                        <div class="field-group">
+                                            <label>Vision Support</label>
+                                            <div class="switch-container">
+                                                <label class="switch">
+                                                    <input type="checkbox" x-model="model.vision">
+                                                    <span class="slider"></span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="field-group">
+                                            <label>Additional Parameters</label>
+                                            <textarea x-model="JSON.stringify(model.kwargs)" placeholder="temperature=0"></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+
+                        <div class="model-list-actions">
+                            <button class="btn btn-primary" @click="addModel()">
+                                <i class="fas fa-plus">+</i> Add Model
+                            </button>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-ok" @click="saveModelList()">Save</button>
+                        <button class="btn btn-cancel" @click="closeModelListEditor()">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
 </body>
 
 </html>

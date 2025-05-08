@@ -176,10 +176,19 @@ class ModelConfig:
 
 @dataclass
 class AgentConfig:
+    # Primary models (for backward compatibility)
     chat_model: ModelConfig
     utility_model: ModelConfig
     embeddings_model: ModelConfig
     browser_model: ModelConfig
+
+    # Failover model lists
+    chat_models: list = field(default_factory=list)
+    utility_models: list = field(default_factory=list)
+    embeddings_models: list = field(default_factory=list)
+    browser_models: list = field(default_factory=list)
+
+    # Other settings
     prompts_subdir: str = ""
     memory_subdir: str = ""
     knowledge_subdirs: list[str] = field(default_factory=lambda: ["default", "custom"])
@@ -519,6 +528,11 @@ class Agent:
         return self.history.output_text(human_label="user", ai_label="assistant")
 
     def get_chat_model(self):
+        # If we have failover models configured, use the FailoverModelManager
+        if self.config.chat_models:
+            manager = models.FailoverModelManager(self.config.chat_models, models.ModelType.CHAT)
+            return manager.get_model()
+        # Otherwise, use the primary model (backward compatibility)
         return models.get_model(
             models.ModelType.CHAT,
             self.config.chat_model.provider,
@@ -527,6 +541,11 @@ class Agent:
         )
 
     def get_utility_model(self):
+        # If we have failover models configured, use the FailoverModelManager
+        if self.config.utility_models:
+            manager = models.FailoverModelManager(self.config.utility_models, models.ModelType.CHAT)
+            return manager.get_model()
+        # Otherwise, use the primary model (backward compatibility)
         return models.get_model(
             models.ModelType.CHAT,
             self.config.utility_model.provider,
@@ -535,6 +554,11 @@ class Agent:
         )
 
     def get_embedding_model(self):
+        # If we have failover models configured, use the FailoverModelManager
+        if self.config.embeddings_models:
+            manager = models.FailoverModelManager(self.config.embeddings_models, models.ModelType.EMBEDDING)
+            return manager.get_model()
+        # Otherwise, use the primary model (backward compatibility)
         return models.get_model(
             models.ModelType.EMBEDDING,
             self.config.embeddings_model.provider,

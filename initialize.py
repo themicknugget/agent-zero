@@ -8,7 +8,7 @@ def initialize():
 
     current_settings = settings.get_settings()
 
-    # chat model from user settings
+    # Primary chat model from user settings (for backward compatibility)
     chat_llm = ModelConfig(
         provider=models.ModelProvider[current_settings["chat_model_provider"]],
         name=current_settings["chat_model_name"],
@@ -20,7 +20,7 @@ def initialize():
         kwargs=current_settings["chat_model_kwargs"],
     )
 
-    # utility model from user settings
+    # Primary utility model from user settings (for backward compatibility)
     utility_llm = ModelConfig(
         provider=models.ModelProvider[current_settings["util_model_provider"]],
         name=current_settings["util_model_name"],
@@ -30,26 +30,43 @@ def initialize():
         limit_output=current_settings["util_model_rl_output"],
         kwargs=current_settings["util_model_kwargs"],
     )
-    # embedding model from user settings
+
+    # Primary embedding model from user settings (for backward compatibility)
     embedding_llm = ModelConfig(
         provider=models.ModelProvider[current_settings["embed_model_provider"]],
         name=current_settings["embed_model_name"],
         limit_requests=current_settings["embed_model_rl_requests"],
         kwargs=current_settings["embed_model_kwargs"],
     )
-    # browser model from user settings
+
+    # Primary browser model from user settings (for backward compatibility)
     browser_llm = ModelConfig(
         provider=models.ModelProvider[current_settings["browser_model_provider"]],
         name=current_settings["browser_model_name"],
         vision=current_settings["browser_model_vision"],
         kwargs=current_settings["browser_model_kwargs"],
     )
+
+    # Get failover model lists
+    chat_models = current_settings.get("chat_models", [])
+    util_models = current_settings.get("util_models", [])
+    embed_models = current_settings.get("embed_models", [])
+    browser_models = current_settings.get("browser_models", [])
     # agent configuration
     config = AgentConfig(
+        # Primary models (for backward compatibility)
         chat_model=chat_llm,
         utility_model=utility_llm,
         embeddings_model=embedding_llm,
         browser_model=browser_llm,
+
+        # Failover model lists
+        chat_models=chat_models,
+        utility_models=util_models,
+        embeddings_models=embed_models,
+        browser_models=browser_models,
+
+        # Other settings
         prompts_subdir=current_settings["agent_prompts_subdir"],
         memory_subdir=current_settings["agent_memory_subdir"],
         knowledge_subdirs=["default", current_settings["agent_knowledge_subdir"]],

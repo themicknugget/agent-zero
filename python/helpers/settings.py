@@ -9,16 +9,30 @@ from python.helpers import runtime, whisper, defer
 from . import files, dotenv
 
 
+class ModelSettings(TypedDict):
+    provider: str
+    name: str
+    kwargs: dict[str, str]
+    ctx_length: int
+    vision: bool
+    rl_requests: int
+    rl_input: int
+    rl_output: int
+
 class Settings(TypedDict):
+    # Primary model settings (for backward compatibility)
     chat_model_provider: str
     chat_model_name: str
     chat_model_kwargs: dict[str, str]
     chat_model_ctx_length: int
-    chat_model_ctx_history: float
     chat_model_vision: bool
     chat_model_rl_requests: int
     chat_model_rl_input: int
     chat_model_rl_output: int
+
+    # Failover model lists
+    chat_models: list[ModelSettings]
+    chat_model_ctx_history: float
 
     util_model_provider: str
     util_model_name: str
@@ -28,17 +42,20 @@ class Settings(TypedDict):
     util_model_rl_requests: int
     util_model_rl_input: int
     util_model_rl_output: int
+    util_models: list[ModelSettings]
 
     embed_model_provider: str
     embed_model_name: str
     embed_model_kwargs: dict[str, str]
     embed_model_rl_requests: int
     embed_model_rl_input: int
+    embed_models: list[ModelSettings]
 
     browser_model_provider: str
     browser_model_name: str
     browser_model_vision: bool
     browser_model_kwargs: dict[str, str]
+    browser_models: list[ModelSettings]
 
     agent_prompts_subdir: str
     agent_memory_subdir: str
@@ -200,6 +217,19 @@ def convert_out(settings: Settings) -> SettingsOutput:
         }
     )
 
+    # Add a button to manage failover models
+    chat_model_fields.append(
+        {
+            "id": "chat_models_button",
+            "title": "Manage Failover Models",
+            "description": "Configure multiple models for failover. If the primary model fails, the system will try the next model in the list.",
+            "type": "button",
+            "value": "Edit Model List",
+            "action": "edit_model_list",
+            "model_type": "chat",
+        }
+    )
+
     chat_model_section: SettingsSection = {
         "id": "chat_model",
         "title": "Chat Model",
@@ -270,6 +300,19 @@ def convert_out(settings: Settings) -> SettingsOutput:
         }
     )
 
+    # Add a button to manage failover models
+    util_model_fields.append(
+        {
+            "id": "util_models_button",
+            "title": "Manage Failover Models",
+            "description": "Configure multiple models for failover. If the primary model fails, the system will try the next model in the list.",
+            "type": "button",
+            "value": "Edit Model List",
+            "action": "edit_model_list",
+            "model_type": "util",
+        }
+    )
+
     util_model_section: SettingsSection = {
         "id": "util_model",
         "title": "Utility model",
@@ -330,6 +373,19 @@ def convert_out(settings: Settings) -> SettingsOutput:
         }
     )
 
+    # Add a button to manage failover models
+    embed_model_fields.append(
+        {
+            "id": "embed_models_button",
+            "title": "Manage Failover Models",
+            "description": "Configure multiple models for failover. If the primary model fails, the system will try the next model in the list.",
+            "type": "button",
+            "value": "Edit Model List",
+            "action": "edit_model_list",
+            "model_type": "embed",
+        }
+    )
+
     embed_model_section: SettingsSection = {
         "id": "embed_model",
         "title": "Embedding Model",
@@ -377,6 +433,19 @@ def convert_out(settings: Settings) -> SettingsOutput:
             "description": "Any other parameters supported by the model. Format is KEY=VALUE on individual lines, just like .env file.",
             "type": "textarea",
             "value": _dict_to_env(settings["browser_model_kwargs"]),
+        }
+    )
+
+    # Add a button to manage failover models
+    browser_model_fields.append(
+        {
+            "id": "browser_models_button",
+            "title": "Manage Failover Models",
+            "description": "Configure multiple models for failover. If the primary model fails, the system will try the next model in the list.",
+            "type": "button",
+            "value": "Edit Model List",
+            "action": "edit_model_list",
+            "model_type": "browser",
         }
     )
 
@@ -704,6 +773,8 @@ def _get_api_key_field(settings: Settings, provider: str, title: str) -> Setting
 
 def convert_in(settings: dict) -> Settings:
     current = get_settings()
+
+    # Process regular fields
     for section in settings["sections"]:
         if "fields" in section:
             for field in section["fields"]:
@@ -714,6 +785,17 @@ def convert_in(settings: dict) -> Settings:
                         current["api_keys"][field["id"]] = field["value"]
                     else:
                         current[field["id"]] = field["value"]
+
+    # Process model lists if they exist in the settings
+    if "chat_models" in settings:
+        current["chat_models"] = settings["chat_models"]
+    if "util_models" in settings:
+        current["util_models"] = settings["util_models"]
+    if "embed_models" in settings:
+        current["embed_models"] = settings["embed_models"]
+    if "browser_models" in settings:
+        current["browser_models"] = settings["browser_models"]
+
     return current
 
 
@@ -792,7 +874,9 @@ def _write_sensitive_settings(settings: Settings):
 def get_default_settings() -> Settings:
     from models import ModelProvider
 
-    return Settings(
+    # Create default settings with primary models
+    default_settings = Settings(
+        # Primary model settings (for backward compatibility)
         chat_model_provider=ModelProvider.OPENAI.name,
         chat_model_name="gpt-4o",
         chat_model_kwargs={"temperature": "0"},
@@ -802,6 +886,7 @@ def get_default_settings() -> Settings:
         chat_model_rl_requests=0,
         chat_model_rl_input=0,
         chat_model_rl_output=0,
+
         util_model_provider=ModelProvider.OPENAI.name,
         util_model_name="gpt-4o-mini",
         util_model_ctx_length=120000,
@@ -810,15 +895,120 @@ def get_default_settings() -> Settings:
         util_model_rl_requests=60,
         util_model_rl_input=0,
         util_model_rl_output=0,
+
         embed_model_provider=ModelProvider.HUGGINGFACE.name,
         embed_model_name="sentence-transformers/all-MiniLM-L6-v2",
         embed_model_kwargs={},
         embed_model_rl_requests=0,
         embed_model_rl_input=0,
+
         browser_model_provider=ModelProvider.OPENAI.name,
         browser_model_name="gpt-4o",
         browser_model_vision=False,
         browser_model_kwargs={"temperature": "0"},
+
+        # Failover model lists
+        chat_models=[
+            # First model is the primary model (same as above)
+            {
+                "provider": ModelProvider.OPENAI.name,
+                "name": "gpt-4o",
+                "kwargs": {"temperature": "0"},
+                "ctx_length": 120000,
+                "vision": False,
+                "rl_requests": 0,
+                "rl_input": 0,
+                "rl_output": 0,
+            },
+            # Add a backup model
+            {
+                "provider": ModelProvider.ANTHROPIC.name,
+                "name": "claude-3-opus-20240229",
+                "kwargs": {"temperature": "0"},
+                "ctx_length": 100000,
+                "vision": False,
+                "rl_requests": 0,
+                "rl_input": 0,
+                "rl_output": 0,
+            }
+        ],
+
+        util_models=[
+            # First model is the primary model (same as above)
+            {
+                "provider": ModelProvider.OPENAI.name,
+                "name": "gpt-4o-mini",
+                "kwargs": {"temperature": "0"},
+                "ctx_length": 120000,
+                "vision": False,
+                "rl_requests": 60,
+                "rl_input": 0,
+                "rl_output": 0,
+            },
+            # Add a backup model
+            {
+                "provider": ModelProvider.ANTHROPIC.name,
+                "name": "claude-3-haiku-20240307",
+                "kwargs": {"temperature": "0"},
+                "ctx_length": 100000,
+                "vision": False,
+                "rl_requests": 0,
+                "rl_input": 0,
+                "rl_output": 0,
+            }
+        ],
+
+        embed_models=[
+            # First model is the primary model (same as above)
+            {
+                "provider": ModelProvider.HUGGINGFACE.name,
+                "name": "sentence-transformers/all-MiniLM-L6-v2",
+                "kwargs": {},
+                "ctx_length": 0,
+                "vision": False,
+                "rl_requests": 0,
+                "rl_input": 0,
+                "rl_output": 0,
+            },
+            # Add a backup model
+            {
+                "provider": ModelProvider.OPENAI.name,
+                "name": "text-embedding-3-small",
+                "kwargs": {},
+                "ctx_length": 0,
+                "vision": False,
+                "rl_requests": 0,
+                "rl_input": 0,
+                "rl_output": 0,
+            }
+        ],
+
+        browser_models=[
+            # First model is the primary model (same as above)
+            {
+                "provider": ModelProvider.OPENAI.name,
+                "name": "gpt-4o",
+                "kwargs": {"temperature": "0"},
+                "ctx_length": 0,
+                "vision": False,
+                "rl_requests": 0,
+                "rl_input": 0,
+                "rl_output": 0,
+            },
+            # Add a backup model
+            {
+                "provider": ModelProvider.ANTHROPIC.name,
+                "name": "claude-3-opus-20240229",
+                "kwargs": {"temperature": "0"},
+                "ctx_length": 0,
+                "vision": False,
+                "rl_requests": 0,
+                "rl_input": 0,
+                "rl_output": 0,
+            }
+        ],
+
+        # Rest of the settings
         api_keys={},
         auth_login="",
         auth_password="",
@@ -837,6 +1027,8 @@ def get_default_settings() -> Settings:
         stt_silence_duration=1000,
         stt_waiting_timeout=2000,
     )
+
+    return default_settings
 
 
 def _apply_settings(previous: Settings | None):
@@ -863,6 +1055,7 @@ def _apply_settings(previous: Settings | None):
             _settings["embed_model_name"] != previous["embed_model_name"]
             or _settings["embed_model_provider"] != previous["embed_model_provider"]
             or _settings["embed_model_kwargs"] != previous["embed_model_kwargs"]
+            or _settings.get("embed_models", []) != previous.get("embed_models", [])
         ):
             from python.helpers.memory import reload as memory_reload
             memory_reload()

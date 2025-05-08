@@ -31,6 +31,7 @@ from langchain_mistralai import ChatMistralAI
 from python.helpers import dotenv, runtime
 from python.helpers.dotenv import load_dotenv
 from python.helpers.rate_limiter import RateLimiter
+from python.helpers.print_style import PrintStyle
 
 # environment variables
 load_dotenv()
@@ -73,6 +74,53 @@ def get_model(type: ModelType, provider: ModelProvider, name: str, **kwargs):
     fnc_name = f"get_{provider.name.lower()}_{type.name.lower()}"  # function name of model getter
     model = globals()[fnc_name](name, **kwargs)  # call function by name
     return model
+
+
+class FailoverModelManager:
+    """
+    Manages a list of models with failover capability.
+    If a model fails, it will try the next one in the list.
+    """
+    def __init__(self, model_configs: list, model_type: ModelType):
+        self.model_configs = model_configs
+        self.model_type = model_type
+        self.current_index = 0
+        self.last_error = None
+
+    def get_model(self):
+        """
+        Try to get a working model from the list.
+        If all models fail, raise the last error.
+        """
+        # If no models, raise error
+        if not self.model_configs:
+            raise Exception("No models configured for failover")
+
+        # Try each model in order until one works
+        start_index = self.current_index
+        while True:
+            try:
+                config = self.model_configs[self.current_index]
+                provider = ModelProvider[config["provider"]]
+                model = get_model(
+                    self.model_type,
+                    provider,
+                    config["name"],
+                    **config.get("kwargs", {})
+                )
+                return model
+            except Exception as e:
+                self.last_error = e
+                PrintStyle().print(f"Model {config['provider']}\\{config['name']} failed: {str(e)}")
+
+                # Move to next model
+                self.current_index = (self.current_index + 1) % len(self.model_configs)
+
+                # If we've tried all models, raise the last error
+                if self.current_index == start_index:
+                    raise Exception(f"All models failed. Last error: {str(self.last_error)}")
+
+                PrintStyle().print(f"Trying next model: {self.model_configs[self.current_index]['provider']}\\{self.model_configs[self.current_index]['name']}")
 
 
 def get_rate_limiter(
@@ -315,9 +363,9 @@ def get_deepseek_chat(
         base_url = (
             dotenv.get_dotenv_value("DEEPSEEK_BASE_URL") or "https://api.deepseek.com"
         )
-    
+
     return ChatOpenAI(api_key=api_key, model=model_name, base_url=base_url, **kwargs)  # type: ignore
-    
+
 # OpenRouter models
 def get_openrouter_chat(
     model_name: str,

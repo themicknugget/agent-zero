@@ -269,6 +269,28 @@ const settingsModalProxy = {
 
     handleFieldButton(field) {
         console.log(`Button clicked: ${field.action}`);
+    },
+
+    // Handle button actions in settings
+    handleButtonAction(field) {
+        console.log(`Button action: ${field.action}`);
+
+        if (field.action === 'edit_model_list') {
+            // Open the model list editor
+            const modelListEditorModal = document.getElementById('modelListEditorModal');
+            if (modelListEditorModal) {
+                const modelListManager = Alpine.$data(modelListEditorModal);
+                if (modelListManager) {
+                    // Set the model type and open the editor
+                    modelListManager.openModelListEditor(field.model_type);
+
+                    // Dispatch an event to update the model lists
+                    const modalEl = document.getElementById('settingsModal');
+                    const modalAD = Alpine.$data(modalEl);
+                    document.dispatchEvent(new CustomEvent('settings-updated', { detail: modalAD.settings }));
+                }
+            }
+        }
     }
 };
 
